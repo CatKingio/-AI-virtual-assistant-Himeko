@@ -4,142 +4,139 @@ import asyncio
 import re
 import speech_recognition as sr
 from EdgeGPT import Chatbot, ConversationStyle
-import json
 from gtts import gTTS
 from playsound import playsound
 import os
+import webbrowser
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from underthesea import word_tokenize
+from googlesearch import search
 
 
-# Key OpenAI API
-openai.api_key = "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"
+wake_word = "dậy"
+bot = Chatbot('bing_cookies_my.json') 
 
-# Tạo WAKE_WORD
-recognizer = sr.Recognizer()
-BING_WAKE_WORD = "alo"
-GPT_WAKE_WORD = "linh linh"
-
-def get_wake_word(phrase):
-    if BING_WAKE_WORD in phrase.lower():
-        return BING_WAKE_WORD
-    elif GPT_WAKE_WORD in phrase.lower():
-        return GPT_WAKE_WORD
-    else:
-        return None
-    
+r = sr.Recognizer()
+def getcommand():
+    with sr.Microphone() as source:
+        print("Hệ thống: Lắng nghe...")
+        audio =r.listen(source)
+        try:
+            query = (r.recognize_google(audio, language='vi-VN')).lower()
+            print(f"- Đại zương nói: {query}" )
+            return query
+        except Exception as e:
+            return "Hệ thống: Lỗi gòy, thử lại đại zương ơi..."
+        
 def play_sound(text):
     tts = gTTS(text, lang='vi')
     tts.save('temp.mp3')
     playsound('temp.mp3')
     os.remove('temp.mp3')
+    
+def bot_respone(text):
+    print("Hệ thống: " + str(text))
+    play_sound(text)
+    
+    
+with open("vietnamese.txt" , encoding="utf-8") as file:
+    stopwords = file.readlines()
+stop_words = [x[:-1] for x in stopwords]
+
+def delete_stopword(text,*word_delete):
+    if word_delete is None:
+        word_delete = ()
+    word_tokens = word_tokenize(text)
+    #stop_words.append('object')
+    filtered_sentence = []
+    for w in word_tokens:
+        if w not in stop_words and w not in word_delete:
+            filtered_sentence.append(w) 
+            
+    query = " ".join([w for w in filtered_sentence if re.search('[a-z]', w)])
+    return query
+
+def delete_word(query,*word_delete):
+    for word in word_delete:
+        query = query.replace(word, "")
+    query = re.sub(r"\[\^\d+\^\]", "", query) 
+    return query 
+
+def search_and_open(keyword,number):
+    urls = []
+    for url in search(keyword, num_results = int(number)):
+        webbrowser.open_new_tab(url)
+        urls.append(url)
+        print(urls)
+    return urls
+# results = search_and_open("how to learn programming")
+
 
 async def main():
     while True:
-
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            print(f"'lép' hoặc 'linh linh' chọn đi...")
+        query = getcommand()
+        if wake_word in query:
+            bot_respone("Xin chào, Tôi là Friday, trợ lý ảo cá nhân, Nói đi đừng ngại")
+            # print("zô")
             while True:
-                audio = recognizer.listen(source)
-                try:
-                    with open("audio.wav", "wb") as f:
-                        f.write(audio.get_wav_data())
-                    # Use the preloaded tiny_model
-                    
-                    r = sr.Recognizer()
-                    # Mở file audio và đọc dữ liệu từ file
-                    with sr.AudioFile('audio.wav') as source1:
-                        audio_data = r.record(source1)
-                    # Nhận dạng giọng nói và xuất ra văn bản
-                    text = r.recognize_google(audio_data, language='vi-VN')
-                    
-                    # print("đã lưu xong1")
-                    # # Use the preloaded tiny_model
-                    # model = whisper.load_model("tiny")
-                    # print("đã lưu xong 2")
-                    # result = model.transcribe("audio/audio.wav")
-                    # print("đã lưu xong 3")
-            
-                    
-                    phrase = text
-                    print(f"Đại vương nói: {phrase}")
-
-                    wake_word = get_wake_word(phrase)
-                    if wake_word is not None:
-                        break
-                    else:
-                        print("Em nào vậy cho thử lại...")
-                except Exception as e:
-                    print("Lỗi nữa gòy Đại vương ưi {0}".format(e))
-                    continue
+                query = getcommand()
+                if "mở" in query or "tìm" in query:
+                    query = delete_stopword(query,"mở")
+                    web = f"https://www.{query}.com"
+                    try:
+                        response = requests.get(web)
+                        if response.status_code == 200:
+                            webbrowser.open(web)
+                            print(f"Hệ thống: Trang web {web} đang hoạt động")
+                            bot_respone(f"Tôi đã mở {query} cho bạn")
+                        else:
+                            print(f"Mã trạng thái phản hồi không hợp lệ: {response.status_code}")
+                    except:
+                        # print(f"Hệ thống: Không thể kết nối đến trang web {query}")
+                        bot_respone(f"Tôi sẽ thử tìm {query} trên google")
+                        search_and_open(query,1)
+                        continue
+                        
+                elif "hỏi" in query:
+                    bot_respone("Câu hỏi của bạn đang được xử lý...")    
+                    try:
+                        response = await bot.ask(prompt=query, conversation_style=ConversationStyle.precise)
+                        for message in response["item"]["messages"]:
+                            if message["author"] == "bot":
+                                query = message["text"]
+                        query = delete_word(query, "Xin chào, đây là Bing." , "Tôi có thể hiểu và giao tiếp bằng tiếng Việt.")
+                        bot_respone(query)
+                        await bot.close()
+                        continue
+                        
+                    except:
+                        return "Hệ thống: Lỗi gòy, thử lại đại zương ơi..."
+                elif "dừng lại" in query:
+                    bot_respone("Tạm biệt")
+                    break
+                else:
+                    print("Hệ thống: Không thể nhận diện lệnh, thử lại đại zương ơi")
+        elif "dừng lại" in query:
+            text="Tạm biệt"
+            print("Hệ thống:" + str(text))
+            play_sound(text)
+            break
+        else:
+            print("Hệ thống: Không thể nhận diện lệnh, thử lại đại zương ơi")
         
-            # Chỗ này để giữ nguyên
-            print("Nói đi đừng ngại...")
-            play_sound('Nói đi đừng ngại')
-            audio = recognizer.listen(source)
-            try:
-                with open("audio.wav", "wb") as f:
-                        f.write(audio.get_wav_data())
-                with sr.AudioFile('audio.wav') as source2:
-                    audio_data = r.record(source2)
-                # Nhận dạng giọng nói và xuất ra văn bản
-                text = r.recognize_google(audio_data, language='vi-VN')
-                user_input = text 
-                print(f"Mày nói: {user_input}")
-            except Exception as e:
-                print("Lỗi nữa gòy: {0}".format(e))
-                continue
+       
 
-            if wake_word == BING_WAKE_WORD:
-                print("xong 4")
-                
-                with open("bing_cookies_my.json", "r") as file:
-                    cookies = json.load(file)
 
-                # Khởi tạo Chatbot với cookies
-                # bot = Chatbot(cookies=cookies)
-                bot = Chatbot('bing_cookies_my.json')
 
-                # bot = Chatbot("bing_cookies_my.json")
-                # bot = await Chatbot.create()
-                print("xong 5")
-                response = await bot.ask(prompt=user_input, conversation_style=ConversationStyle.precise)
-                
-                # Select only the bot response from the response dictionary
-                print("xong 6")
-                for message in response["item"]["messages"]:
-                    if message["author"] == "bot":
-                        bot_response = message["text"]
-                # Remove [^#^] citations in response
-                print("xong 7")
-                pattern = r"Xin chào, đây là Bing|\[\^\d+\^\]"
-                bot_response = re.sub(pattern, "", bot_response)
 
-            else:
-                # Send prompt to GPT-3.5-turbo API
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content":
-                        "You are a helpful assistant."},
-                        {"role": "user", "content": user_input},
-                    ],
-                    temperature=0.5,
-                    max_tokens=150,
-                    top_p=1,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                    n=1,
-                    stop=["\nUser:"],
-                )
 
-                bot_response = response["choices"][0]["message"]["content"]
-                
-        print("Phản hồi của bot:", bot_response)
-        # print("Lỗi nữa gòy:")
-        play_sound(bot_response)
-        # play_audio('response2.mp3')
-        await bot.close()
+
+
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    r = sr.Recognizer()
+    print("//////////////// Trợ lý ảo Bé Bảy đã khởi động \\\\\\\\\\\\\\\\\\\\")
+    asyncio.run(main())  
