@@ -16,7 +16,14 @@ from googlesearch import search
 
 
 wake_word = "dậy"
-bot = Chatbot('bing_cookies_my.json') 
+
+#Pls copy your cookies bing.com web over here
+#You can use this extension in Google Chrome: "https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=eng" to copy cookies after you have already accessed Bing.com 
+
+#Hãy copy cookies trang web bing.com của bạn vào đây
+#Bạn có thể dùng extension trong Google Chrome: "https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=eng"để copy cookies khi đã truy cập vào Bing.com
+
+bot = Chatbot('bing_cookies_your.json') 
 
 r = sr.Recognizer()
 def getcommand():
@@ -137,6 +144,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    r = sr.Recognizer()
     print("//////////////// Trợ lý ảo Bé Bảy đã khởi động \\\\\\\\\\\\\\\\\\\\")
     asyncio.run(main())  
