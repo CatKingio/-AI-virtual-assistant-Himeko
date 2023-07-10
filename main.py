@@ -1,8 +1,10 @@
 import os
 import re
+import threading
 import asyncio
 import webbrowser
 import requests
+from colorama import Fore, Back, Style
 import speech_recognition as sr
 from gtts import gTTS
 from playsound import playsound
@@ -11,6 +13,7 @@ from underthesea import word_tokenize
 from googlesearch import search
 
 from EdgeGPT import Chatbot, ConversationStyle
+from Crypto.Util import number
 
 
 #Pls copy your cookies bing.com web over "bing_cookies_your.json"
@@ -20,38 +23,64 @@ from EdgeGPT import Chatbot, ConversationStyle
 #Bạn có thể dùng extension trong Google Chrome: "https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=eng"để copy cookies khi đã truy cập vào Bing.com
 
 cookies_path='bing_cookies_my.json'
+mode = 0
+wake_word = "alo"
+import threading
 
-wake_word = "seven"
-      
-class user_command:
+class Program:
     def __init__(self):
-        self.r = sr.Recognizer()
-    def get(self):
-        try:
-            with sr.Microphone() as source:
-                audio = self.r.listen(source)
-                try:
-                    query = self.r.recognize_google(audio, language='vi-VN').lower()
-                    print(f"- Đại zương nói: {query}" )
-                    return query
-                except Exception as e:
-                    return "Hệ thống: Lỗi gòy, thử lại đại zương ơi..."
-        except:
-            query = input("Nhận lệnh: ")
-            return query
+        self.is_running = False
+        self.is_paused = False
+        self.pause_event = threading.Event()
+
+    def run(self):
+        self.is_running = True
+
+    def stop(self):
+        self.is_running = False
+
 
 class bot_response:
+    def __init__(self): 
+        self.avt= Fore.MAGENTA + "\n   /)⑅/) \n꒰˶• ༝•˶꒱\n./づ~ ♡ Eula: " + Style.RESET_ALL
+        self.avt2 =Fore.GREEN + "\n  (\ (\ \n(„• ֊ •„) ♡\n━O━O━━━━━ Bạn: " + Style.RESET_ALL
     def voice(self,query):
         tts = gTTS(query, lang='vi')
         tts.save('temp.mp3')
         playsound('temp.mp3')
         os.remove('temp.mp3')
     def text(self,query):
-        print("Hệ thống: " + str(query))
+        print(self.avt + str(query))
     def text_voice(self,query):
         self.text(query)
         self.voice(query)
-   
+
+        
+class user_command(bot_response):
+
+    def __init__(self):
+        super().__init__()
+        self.r = sr.Recognizer()
+    def get(self):
+        global mode
+        if mode == 1:
+            with sr.Microphone() as source:
+                audio = self.r.listen(source)
+                try:
+                    query = self.r.recognize_google(audio, language='vi-VN').lower()
+                    print(self.avt2 + str(query))
+                    return query
+                except Exception as e:
+                    query = "none"
+                    print(self.avt + "Eula không nhận được lệnh, hãy thử lại nào!")
+                    return query
+        else:
+            query = input(self.avt2)
+            return query    
+        # except:
+        #     pass
+        #     query = input(self.avt2)
+        #     return query
 class NLP:
     def __init__(self):
         with open("vietnamese.txt", "r", encoding="utf-8") as file:
@@ -69,17 +98,19 @@ class NLP:
     
     def clear_word(self, text, *word_delete):
         text_cleared = text # Tạo một bản sao của `text` để thực hiện việc loại bỏ từ
-        for word in word_delete:
-            text_cleared = text_cleared.replace(word, "") # Loại bỏ từ cần xóa trong `text_cleared`
-        return text_cleared.strip()
+        # for word in word_delete:
+        #     text_cleared = text_cleared.replace(word, "") # Loại bỏ từ cần xóa trong `text_cleared`
+        # return text_cleared.strip()
         # query_cleared = query.replace('\n', ' ').strip()  # Thay thế cả xuống dòng, tab, space dư thừa bằng khoảng trắng
         for word in word_delete:
-            query_cleared = re.sub(fr"\b{word}\b", "", text2_cleared)  # Loại bỏ các từ được chỉ định
+            text_cleared = text_cleared.replace(word, "")
+            query_cleared = re.sub(fr"\b{word}\b", "", text_cleared)  # Loại bỏ các từ được chỉ định
         query_cleared = re.sub(r"\[\^\d+\^\]", "", query_cleared) 
         return query_cleared.strip()  # Loại bỏ khoảng trắng đầu/chuỗi
     
-class bing_response:
+class bing_response(NLP):
     def __init__(self, cookies_path='bing_cookies_my.json'):
+        super().__init__()
         self.bot = Chatbot(cookies_path)
 
     async def main(self, query):
@@ -87,7 +118,7 @@ class bing_response:
         for message in response["item"]["messages"]:
             if message["author"] == "bot":
                 bot_response = message["text"]
-
+        bot_response = self.clear_word(bot_response , "Xin chào, đây là Bing.", "Tôi có thể hiểu và giao tiếp bằng tiếng Việt." )
         await self.bot.close()
         return bot_response
     def run(self, query):
@@ -102,64 +133,80 @@ class web:
         response = requests.get(web)
         if response.status_code == 200:
             webbrowser.open(web)
-            return f"Tôi đã mở {keyword} cho bạn"
+            return f"Eula đã mở {keyword} cho bạn"
         else:
-            return f"Mã trạng thái phản hồi không hợp lệ: {response.status_code}"
-    def sreach(self,keyword,number):
+            return f"Eula phát hiện, mã trạng thái phản hồi không hợp lệ: {response.status_code}"
+    def sreach_open(self, keyword, number):
         urls = []
-        for url in search(keyword, num_results = int(number)):
-            try:
+        try:
+            for url in search(keyword, num_results=int(number)):
                 webbrowser.open_new_tab(url)
                 urls.append(url)
-                print(urls)
-                return f"Tôi sẽ thử tìm {keyword} trên google"
-            except:
-                return f"Không tìm được trang web phù hợp"
+            return f"Eula đã tìm :{keyword} trên Google và mở {len(urls)} kết quả trong trình duyệt"
+        except:
+            return f"Eula không tìm được trang web phù hợp hoặc có lỗi xảy ra"
     
 
-
 class Seven:
-    wake_word = "dậy"
-    def __init__(self, ):
+    wake_word = "alo"
+    def __init__(self):
+        self.Program = Program()
         self.user_command = user_command()
         self.bot_response = bot_response()
         self.bing_response = bing_response()
         self.NLP = NLP()
         self.web = web()
+    
     def main(self):
-        self.bot_response.text("\n\n ----- March 7th active ----- \n")
-        while True:
-            self.bot_response.text("Lắng nghe...")
+        global mode
+        self.bot_response.text_voice(" ----- Eula active ૮ ˶ᵔ ᵕ ᵔ˶ ა ----- ")
+        self.Program.run()
+        while self.Program.is_running:
+            self.bot_response.text("Hãy đánh thức Eula...")
             query = self.user_command.get()           
             if wake_word in query:
-                self.bot_response.text("Xin chào, Tôi là March 7th, trợ lý ảo cá nhân, Nói đi đừng ngại")
-                while True:
-                    query = self.user_command.get() 
-                    if "mở" in query or "tìm" in query:
-                        query = self.NLP.clear_all(query,"mở")
-                        try: 
-                            self.bot_response.text_voice(self.web.open(query))
-                        except:
-                            self.bot_response.text_voice(self.web.sreach(query,1))
-                    elif "chờ" in query:
-                        query = self.NLP.clear_all(query,"mở")   
-                    elif "hỏi" in query:
-                        self.bot_response.text("Câu hỏi đang xử lý...") 
-                        new_query = self.bing_response.run(query)
-                        query = self.NLP.clear_word(new_query, "Xin chào, đây là Bing." , "Tôi có thể hiểu và giao tiếp bằng tiếng Việt." )
-                        self.bot_response.text_voice(query)
-   
-                    elif "chờ" in query:
-                        self.bot_response.text("Trạng thái chờ")
-                        break
-                    else:
-                        self.bot_response.text("Hệ thống: Không thể nhận diện lệnh, thử lại đại zương ơi")
-            elif "dừng lại" in query:
-                self.bot_response.text_voice("Tạm biệt")
+                self.bot_response.text_voice("Xin chào, mình là Eula, hãy yêu cầu mình bất cứ điều gì")
+                self.CommandExecutor()
+            elif "thoát" in query:
+                self.bot_response.text("Tạm biệt")
                 break
             else:
-                print("Hệ thống: Không thể nhận diện lệnh, thử lại đại zương ơi")
+                self.bot_response.text("Eula không hiểu yêu cầu của bạn, hãy thử lại nhé!")
+    def CommandExecutor(self):
+        global mode
+        while self.Program.is_running:
+            self.bot_response.text("Lắng nghe...")
+            query = self.user_command.get() 
+            if "mở" in query or "tìm" in query:
+                query = self.NLP.clear_all(query,"mở")
+                try: 
+                    self.bot_response.text(self.web.open(query))
+                except:
+                    self.bot_response.text(self.web.sreach_open(query,1))
 
+            elif "hỏi" in query:
+                self.bot_response.text_voice("Eula đã nhận được câu hỏi, câu hỏi đang xử lý!...") 
+                query = self.bing_response.run(query)
+                self.bot_response.text(query)
+            elif "chờ" in query:
+                self.bot_response.text("Eula đã vào trạng thái chờ")
+                # self.Program.pause()
+                break
+            elif "kết thúc" in query:
+                self.program.stop()
+                # self.Program.pause()
+                break
+            elif "chat" in query:
+                mode = 0
+                self.bot_response.text("Eula đã vào trạng thái chat")
+            elif "giọng nói" in query:
+                mode = 1
+                self.bot_response.text("Eula đã vào trạng thái giọng nói")
+            elif "nhập liệu" in query:
+                pass
+            else:
+                self.bot_response.text("Eula không hiểu yêu cầu của bạn, hãy thử lại nhé!")
+        
 if __name__ == "__main__":
     friday = Seven()
     friday.main()
