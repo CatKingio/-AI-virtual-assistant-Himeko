@@ -2,7 +2,7 @@
 AI virtual assistant (Himeko) - Trợ lý ảo cá nhân 
 - Tìm kiếm trang web
 - Tích hợp Binggpt trả lời các câu hỏi
-- Sử dụng giọng nói & văn bản
+- Sử dụng giọng nói và văn bản
   
 - Đang trong quá trình phát triển gồm:
 + Thu thập dữ liệu web
