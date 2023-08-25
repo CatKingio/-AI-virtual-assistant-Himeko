@@ -1,5 +1,6 @@
 # -AI-virtual-assistant-Himeko-
-- AI virtual assistant (Himeko) - Trợ lý ảo cá nhân 
+- AI virtual assistant (Himeko) - Trợ lý ảo cá nhân
+  + Model NLP Transformers 
   + Tìm kiếm trang web
   + Tích hợp Binggpt trả lời các câu hỏi
   + Sử dụng giọng nói & văn bản
